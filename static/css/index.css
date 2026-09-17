@@ -122,6 +122,10 @@ body {
     line-height: 1.1 !important;
 }
 
+.publication-title .acronym {
+    color: var(--primary-color);
+}
+
 .publication-banner {
   max-height: 70vh;
   border-radius: var(--border-radius-lg);
@@ -253,6 +257,28 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
+.framework-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--border-radius-lg);
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.video-grid video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  background: #000;
+}
+
 .results-carousel {
   overflow: hidden;
   padding: 1rem 0;
@@ -281,6 +307,14 @@ body {
   border-radius: var(--border-radius);
   width: 100%;
   height: auto;
+}
+
+.results-carousel .item img.carousel-figure {
+  display: block;
+  width: auto;
+  max-width: 50%;
+  max-height: 70vh;
+  margin: 0 auto;
 }
 
 .results-carousel .subtitle {
@@ -612,6 +646,10 @@ code {
     font-size: 2.5rem !important;
     line-height: 1.2 !important;
     margin-bottom: 1.5rem !important;
+  }
+  
+  .video-grid {
+    grid-template-columns: 1fr;
   }
   
   .publication-authors {
