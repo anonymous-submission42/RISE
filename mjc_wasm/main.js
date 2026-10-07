@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import loadMujoco from 'mujoco';
-import { sampleLocalSteps, toGlobal, terrainXml, injectTerrain, planCrossesItself } from './js/plan.js';
+import { sampleLocalSteps, toGlobal, terrainXml, ROCK_GROUP, injectTerrain, planCrossesItself } from './js/plan.js';
 import { Mlp } from './js/policy.js';
 import { Controller } from './js/controller.js';
 
@@ -66,14 +66,36 @@ function checkerTexture(rgba, tiles) {
   return tex;
 }
 
+// Rock columns are static world boxes, often thousands of them: one instanced
+// draw call, posed once from the model (world body at the origin).
+function rockInstances(model, ids) {
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.05 }), ids.length);
+  const { geom_pos: pos, geom_quat: quat, geom_size: size, geom_rgba: rgba } = model;
+  const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion();
+  const s = new THREE.Vector3(), c = new THREE.Color();
+  ids.forEach((g, k) => {
+    p.set(pos[3 * g], pos[3 * g + 1], pos[3 * g + 2]);
+    q.set(quat[4 * g + 1], quat[4 * g + 2], quat[4 * g + 3], quat[4 * g]);
+    s.set(2 * size[3 * g], 2 * size[3 * g + 1], 2 * size[3 * g + 2]);
+    mesh.setMatrixAt(k, m.compose(p, q, s));
+    mesh.setColorAt(k, c.setRGB(rgba[4 * g], rgba[4 * g + 1], rgba[4 * g + 2]).convertSRGBToLinear());
+  });
+  mesh.castShadow = mesh.receiveShadow = true;
+  return mesh;
+}
+
 // One Three.js mesh per visual geom: robot visuals (group 1), terrain (group 2)
-// and foot-target markers (group 5). Group 0 holds the robot's collision geoms.
+// and foot-target markers (group 5), plus one instanced mesh for the rock
+// columns (group 4). Group 0 holds the robot's collision geoms.
 function buildGeoms(mujoco, model, group) {
   const T = mujoco.mjtGeom;
   const meshCache = new Map();
   const objects = [];
+  const rocks = [];
   for (let g = 0; g < model.ngeom; g++) {
     const grp = model.geom_group[g];
+    if (grp === ROCK_GROUP) { rocks.push(g); continue; }
     if (grp !== 1 && grp !== 2 && grp !== TARGET_GROUP) continue;
     const type = model.geom_type[g];
     const size = model.geom_size.subarray(3 * g, 3 * g + 3);
@@ -114,6 +136,7 @@ function buildGeoms(mujoco, model, group) {
     group.add(obj);
     objects.push({ g, obj, grp, static: grp !== 1 });
   }
+  if (rocks.length) group.add(rockInstances(model, rocks));
   return objects;
 }
 
@@ -233,8 +256,7 @@ async function main() {
     for (const { obj, grp } of geoms) if (grp === TARGET_GROUP) obj.visible = on;
   }
 
-  $('chk-targets').onchange = () => showTargets(sim.geoms);
-  $('btn-new').onclick = () => load(Math.floor(Math.random() * 1e6));
+  $('chk-targets').onchange = () => showTargets(sim.geoms);  $('btn-new').onclick = () => load(Math.floor(Math.random() * 1e6));
   $('btn-seed').onclick = () => load(Math.max(0, parseInt($('seed').value, 10) || 0));
   $('btn-restart').onclick = restart;
   $('btn-pause').onclick = () => { paused = !paused; $('btn-pause').textContent = paused ? 'Resume' : 'Pause'; };
