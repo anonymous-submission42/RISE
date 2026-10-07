@@ -190,6 +190,16 @@
                   <span>Code</span>
                   </a>
                 </span>
+
+                <span class="link-block">
+                  <a href="#interactive-demo"
+                    class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                    <i class="fas fa-play"></i>
+                  </span>
+                  <span>Live Demo</span>
+                  </a>
+                </span>
               </div>
             </div>
           </div>
@@ -234,7 +244,7 @@
 <section class="hero is-small">
   <div class="hero-body">
     <div class="container is-max-desktop">
-      <h2 class="title is-3">Framework</h2>
+      <h2 class="title is-3">Methods</h2>
       <figure style="margin: 0;">
         <img class="framework-figure" src="static/images/framework.png" alt="RISE framework overview" loading="lazy"/>
         <figcaption style="margin-top: 0.75rem; text-align: center; color: #4a4a4a; font-size: 1rem; line-height: 1.6;">
@@ -245,7 +255,27 @@
   </div>
 </section>
 <!-- End framework -->
- 
+
+<!-- Interactive demo -->
+<section class="hero is-small" id="interactive-demo">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3">Interactive Demo</h2>
+      <!-- <p class="demo-description">
+        The deployed G1 controller running live in your browser on MuJoCo (WebAssembly). A sequence of 100 random 3D footholds is sampled and stepping stones are built under them. At every control step, the FIPM preview controller and inverse kinematics generate the guidance, and the policy follows the footholds. Click <em>New terrain</em> to try another sequence.
+      </p> -->
+      <div class="demo-frame">
+        <button class="demo-launch" type="button" onclick="launchDemo(this)" aria-label="Launch the interactive simulation">
+          <img src="static/images/mujoco_demo_preview.jpg" alt="Unitree G1 stepping across randomly generated stepping stones in the browser simulation" loading="lazy"/>
+          <span class="demo-play"><i class="fas fa-play"></i> Launch simulation</span>
+        </button>
+      </div>
+      <p class="demo-note">Downloads about 30 MB on first launch; a desktop browser is recommended. <a href="mjc_wasm/" target="_blank">Open in a new tab</a></p>
+    </div>
+  </div>
+</section>
+<!-- End interactive demo -->
+
 
 <section class="hero is-small is-light">
   <div class="hero-body">

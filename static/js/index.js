@@ -80,6 +80,15 @@ function scrollToTop() {
     });
 }
 
+// Interactive demo: load the MuJoCo simulation only when asked (~30 MB)
+function launchDemo(button) {
+    const iframe = document.createElement('iframe');
+    iframe.src = 'mjc_wasm/';
+    iframe.title = 'RISE interactive MuJoCo demo';
+    iframe.allow = 'fullscreen';
+    button.replaceWith(iframe);
+}
+
 // Show/hide scroll to top button
 window.addEventListener('scroll', function() {
     const scrollButton = document.querySelector('.scroll-to-top');

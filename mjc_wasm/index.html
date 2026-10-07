@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RISE · MuJoCo WASM Demo</title>
+  <link rel="icon" type="image/x-icon" href="../static/images/rise.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --panel: rgba(18, 22, 30, 0.88); --text: #e8ecf2; --muted: #9aa4b2; --accent: #2563eb; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #1b2330;
+      font-family: 'Noto Sans', system-ui, sans-serif; color: var(--text); }
+    #viewport { position: fixed; inset: 0; }
+    #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 12px; background: #1b2330; z-index: 10; font-size: 15px; }
+    #loading .bar { width: 260px; height: 6px; background: #334; border-radius: 3px; overflow: hidden; }
+    #loading .fill { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+    #panel { position: fixed; top: 12px; right: 12px; width: 320px; max-width: calc(100vw - 24px);
+      background: var(--panel); border-radius: 10px; padding: 14px; overflow-y: auto; font-size: 13px; }
+    #panel h1 { font-size: 16px; margin: 0 0 4px; }
+    #panel p.sub { margin: 0 0 12px; color: var(--muted); }
+    .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    button { flex: 1; padding: 7px 8px; border: 0; border-radius: 6px; background: #2b3444; color: var(--text);
+      font: inherit; cursor: pointer; }
+    button:hover { background: #38445a; }
+    button.primary { background: var(--accent); }
+    .row.seed { align-items: center; }
+    .row.seed label { color: var(--muted); }
+    .row.seed input { flex: 2; min-width: 0; padding: 6px 8px; border: 0; border-radius: 6px;
+      background: #2b3444; color: var(--text); font: inherit; }
+    #status { color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.6;
+      border-top: 1px solid #2f3846; padding-top: 8px; }
+    #status b { color: var(--text); }
+    label.check { display: flex; align-items: center; gap: 6px; margin-top: 10px; cursor: pointer; }
+    .legend { color: var(--muted); font-size: 12px; margin-left: auto; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 3px 0 8px; }
+    .dot.l { background: #3340a0; } .dot.r { background: #a03340; }
+    a { color: #7aa7ff; }
+    @media (max-width: 640px) { #panel { top: auto; bottom: 12px; width: auto; left: 12px; max-height: 45vh; } }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+        "mujoco": "https://cdn.jsdelivr.net/npm/@mujoco/mujoco@3.15.0/mujoco.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="viewport"></div>
+  <div id="loading"><div id="loading-text">Loading MuJoCo…</div><div class="bar"><div class="fill"></div></div></div>
+
+  <div id="panel">
+    <h1>RISE · Footstep Policy on G1</h1>
+    <p class="sub">MuJoCo (WebAssembly) and the footstep policy running in your browser.
+      100 footsteps are sampled, stepping stones are built under them, and the robot
+      follows the plan. <a href="../" target="_top">← Back to RISE</a></p>
+    <div class="row">
+      <button id="btn-new" class="primary">New terrain</button>
+      <button id="btn-restart">Restart</button>
+      <button id="btn-pause">Pause</button>
+    </div>
+    <div class="row seed">
+      <label for="seed">Seed</label>
+      <input id="seed" type="number" min="0" step="1">
+      <button id="btn-seed">Load</button>
+    </div>
+    <div id="status"></div>
+    <label class="check"><input type="checkbox" id="chk-targets" unchecked> Visualize targets
+      <span class="legend"><span class="dot l"></span>left <span class="dot r"></span>right</span></label>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
