@@ -37,6 +37,8 @@
     .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 3px 0 8px; }
     .dot.l { background: #3340a0; } .dot.r { background: #a03340; }
     a { color: #7aa7ff; }
+    #btn-ui { position: fixed; top: 12px; left: 12px; flex: none; z-index: 5; background: var(--panel); }
+    #panel.hidden { display: none; }
     @media (max-width: 640px) { #panel { top: auto; bottom: 12px; width: auto; left: 12px; max-height: 45vh; } }
   </style>
   <script type="importmap">
@@ -52,12 +54,14 @@
 <body>
   <div id="viewport"></div>
   <div id="loading"><div id="loading-text">Loading MuJoCo…</div><div class="bar"><div class="fill"></div></div></div>
+  <button id="btn-ui" type="button">Hide UI</button>
 
   <div id="panel">
     <h1>RISE · Footstep Policy on G1</h1>
-    <p class="sub">MuJoCo (WebAssembly) and the footstep policy running in your browser.
-      100 footsteps are sampled, stepping stones are built under them, and the robot
-      follows the plan. <a href="../" target="_top">← Back to RISE</a></p>
+    <p class="sub">
+      MuJoCo (WebAssembly) simulation and footstep policy running in your browser.
+      <!-- 100 footsteps are sampled, stepping stones are built under them, and the robot follows the plan.  -->
+      <a href="../" target="_top">← Back to RISE</a></p>
     <div class="row">
       <button id="btn-new" class="primary">New terrain</button>
       <button id="btn-restart">Restart</button>

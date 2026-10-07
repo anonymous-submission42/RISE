@@ -238,6 +238,10 @@ async function main() {
   $('btn-seed').onclick = () => load(Math.max(0, parseInt($('seed').value, 10) || 0));
   $('btn-restart').onclick = restart;
   $('btn-pause').onclick = () => { paused = !paused; $('btn-pause').textContent = paused ? 'Resume' : 'Pause'; };
+  $('btn-ui').onclick = () => {
+    const hidden = $('panel').classList.toggle('hidden');
+    $('btn-ui').textContent = hidden ? 'Show UI' : 'Hide UI';
+  };
 
   setProgress(1, 'Compiling model…');
   load(DEFAULT_SEED);

@@ -51,7 +51,7 @@
   
   <!-- Critical CSS - Load synchronously -->
   <link rel="stylesheet" href="static/css/bulma.min.css">
-  <link rel="stylesheet" href="static/css/index.css">
+  <link rel="stylesheet" href="static/css/index.css?v=4">
   
   <!-- Non-critical CSS - Load asynchronously -->
   <link rel="preload" href="static/css/bulma-carousel.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -76,7 +76,7 @@
   <script defer src="static/js/fontawesome.all.min.js"></script>
   <script defer src="static/js/bulma-carousel.min.js"></script>
   <script defer src="static/js/bulma-slider.min.js"></script>
-  <script defer src="static/js/index.js"></script>
+  <script defer src="static/js/index.js?v=4"></script>
   
   <!-- Structured Data for Academic Papers -->
   <script type="application/ld+json">
@@ -273,6 +273,17 @@
       <p class="demo-note">Downloads about 30 MB on first launch; a desktop browser is recommended. <a href="mjc_wasm/" target="_blank">Open in a new tab</a></p>
     </div>
   </div>
+  <!-- Kept inline (not in index.js) so a cached older index.js cannot break the button. -->
+  <script>
+    // Load the MuJoCo simulation (~30 MB) only when asked.
+    function launchDemo(button) {
+      const iframe = document.createElement('iframe');
+      iframe.src = 'mjc_wasm/';
+      iframe.title = 'RISE interactive MuJoCo demo';
+      iframe.allow = 'fullscreen';
+      button.replaceWith(iframe);
+    }
+  </script>
 </section>
 <!-- End interactive demo -->
 
