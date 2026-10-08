@@ -4,16 +4,17 @@ import loadMujoco from 'mujoco';
 import { sampleLocalSteps, toGlobal, terrainXml, ROCK_GROUP, injectTerrain, planCrossesItself } from './js/plan.js';
 import { Mlp } from './js/policy.js';
 import { Controller } from './js/controller.js';
+import { ROBOTS } from './js/robots.js';
 
 const ASSETS = 'assets/';
-const ROBOT_FILE = 'g1_29dof.xml';
+const SCENE_FILE = 'scene_footstep.xml';
 const N_STEPS = 100;
-const DEFAULT_SEED = 6;
-const POLICY = { file: 'policy/260808_1834_3d_nolcp.bin', dims: [660, 512, 256, 128, 12] };
+const POLICY_DIMS = [660, 512, 256, 128, 12];
 const TARGET_GROUP = 5; // foot-target markers (plan.js terrainXml)
 
 const $ = id => document.getElementById(id);
 const setProgress = (frac, msg) => {
+  $('loading').hidden = false;
   $('loading-text').textContent = msg;
   document.querySelector('#loading .fill').style.width = `${(100 * frac).toFixed(0)}%`;
 };
@@ -25,27 +26,39 @@ async function fetchBytes(url) {
 }
 
 // Robot MJCF + meshes into a MuJoCo virtual file system (kept for recompiles).
-async function loadRobotVfs(mujoco) {
-  const robotXml = await fetchBytes(ASSETS + 'g1/' + ROBOT_FILE);
+async function loadRobotVfs(mujoco, robot) {
+  const dir = ASSETS + robot.dir;
+  const robotXml = await fetchBytes(dir + robot.robotFile);
   const doc = new DOMParser().parseFromString(new TextDecoder().decode(robotXml), 'text/xml');
-  const meshDir = doc.querySelector('compiler')?.getAttribute('meshdir') ?? '';
+  const meshDir = (doc.querySelector('compiler')?.getAttribute('meshdir') ?? '').replace(/\/+$/, '');
   const files = [...new Set([...doc.querySelectorAll('mesh[file]')].map(e => e.getAttribute('file')))];
   const vfs = new mujoco.MjVFS();
-  vfs.addBuffer(ROBOT_FILE, robotXml);
+  vfs.addBuffer(robot.robotFile, robotXml);
   let done = 0;
   await Promise.all(files.map(async f => {
     const path = meshDir ? `${meshDir}/${f}` : f;
-    vfs.addBuffer(path, await fetchBytes(ASSETS + 'g1/' + path));
-    setProgress(++done / files.length, `Loading meshes (${done}/${files.length})…`);
+    vfs.addBuffer(path, await fetchBytes(dir + path));
+    setProgress(++done / files.length, `Loading ${robot.name} meshes (${done}/${files.length})…`);
   }));
   return vfs;
 }
 
+// Everything a robot needs besides the terrain: model files, URDF inertia, policy.
+async function loadRobotAssets(mujoco, robot) {
+  const [vfs, sceneXml, inertia, weights] = await Promise.all([
+    loadRobotVfs(mujoco, robot),
+    fetch(ASSETS + robot.dir + SCENE_FILE).then(r => r.text()),
+    fetch(ASSETS + robot.dir + 'urdf_inertia.json').then(r => r.json()),
+    fetchBytes(ASSETS + robot.policy),
+  ]);
+  return { vfs, sceneXml, inertia, mlp: new Mlp(POLICY_DIMS, weights.buffer) };
+}
+
 // gen_cmd.py N --realistic + convert_footcommand_2_global.py, skipping plans that
 // curl back onto themselves (see planCrossesItself).
-function samplePlan(seed) {
+function samplePlan(seed, robot) {
   for (;; seed++) {
-    const plan = toGlobal(sampleLocalSteps(N_STEPS, seed));
+    const plan = toGlobal(sampleLocalSteps(N_STEPS, seed, robot.plan), robot.plan);
     if (!planCrossesItself(plan)) return { plan, seed };
   }
 }
@@ -168,13 +181,8 @@ function disposeGroup(group) {
 async function main() {
   setProgress(0, 'Loading MuJoCo…');
   const mujoco = await loadMujoco();
-  const [vfs, sceneXml, inertia, weights] = await Promise.all([
-    loadRobotVfs(mujoco),
-    fetch(ASSETS + 'g1/scene_footstep.xml').then(r => r.text()),
-    fetch(ASSETS + 'g1/urdf_inertia.json').then(r => r.json()),
-    fetchBytes(ASSETS + POLICY.file),
-  ]);
-  const mlp = new Mlp(POLICY.dims, weights.buffer);
+  const assets = {};  // robot key -> loaded assets
+  let robotKey = 'g1';
 
   // three.js
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -216,10 +224,12 @@ async function main() {
       sim.model.delete();
       disposeGroup(world);
     }
-    const { plan, seed: used } = samplePlan(seed);
-    const model = mujoco.MjModel.from_xml_string(injectTerrain(sceneXml, terrainXml(plan)), vfs);
+    const robot = ROBOTS[robotKey];
+    const { vfs, sceneXml, inertia, mlp } = assets[robotKey];
+    const { plan, seed: used } = samplePlan(seed, robot);
+    const model = mujoco.MjModel.from_xml_string(injectTerrain(sceneXml, terrainXml(plan, robot.terrain)), vfs);
     const data = new mujoco.MjData(model);
-    const ctl = new Controller(mujoco, model, data, { inertia, mlp, plan });
+    const ctl = new Controller(mujoco, model, data, { robot, inertia, mlp, plan });
     const geoms = buildGeoms(mujoco, model, world);
     syncGeoms(data, geoms, true);
     showTargets(geoms);
@@ -265,9 +275,24 @@ async function main() {
     $('btn-ui').textContent = hidden ? 'Show UI' : 'Hide UI';
   };
 
-  setProgress(1, 'Compiling model…');
-  load(DEFAULT_SEED);
-  $('loading').remove();
+  // Switch robot: fetch its assets on first use, then build a new terrain.
+  let switching = false;
+  async function selectRobot(key, seed) {
+    switching = true;
+    try {
+      if (!assets[key]) assets[key] = await loadRobotAssets(mujoco, ROBOTS[key]);
+      robotKey = key;
+      setProgress(1, 'Compiling model…');
+      load(seed ?? ROBOTS[key].defaultSeed);
+    } finally {
+      $('loading').hidden = true;
+      $('robot').value = robotKey;
+      switching = false;
+    }
+  }
+  $('robot').onchange = () => selectRobot($('robot').value).catch(showError);
+
+  await selectRobot(robotKey);
 
   const status = $('status');
   let last = performance.now();
@@ -275,7 +300,7 @@ async function main() {
     const wall = Math.min((now - last) / 1000, 1 / 30); // cap catch-up after tab switches
     last = now;
     const { data, ctl } = sim;
-    if (!paused) {
+    if (!paused && !switching) {
       const tEnd = data.time + wall;
       while (data.time < tEnd) ctl.step();
     }
@@ -303,7 +328,10 @@ function statusText({ ctl, plan, data }) {
     (n ? `landing error: last ${errs[n - 1].toFixed(1)} cm · mean ${mean.toFixed(1)} cm` : '&nbsp;');
 }
 
-main().catch(err => {
+function showError(err) {
   console.error(err);
+  $('loading').hidden = false;
   $('loading-text').textContent = `Error: ${err.message}`;
-});
+}
+
+main().catch(showError);

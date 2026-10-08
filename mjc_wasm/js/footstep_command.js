@@ -22,13 +22,18 @@ class VrpGenerator {
     this.vrpHeight = cfg.vrp_height;
     this.vrpxOffset = cfg.vrpx_offset;
     this.vrpyOffset = cfg.vrpy_offset;
+    // Tocabi stepping-stone leftover (0 disables): a swing whose XY travel is
+    // under this keeps the swing foot's current height instead of step_z.
+    this.cubeDiagonal = cfg.cube_diagonal_length;
     this.NL = ticks(cfg.vrp_horizon_length, this.dt);
     this.vrpRef = Array.from({ length: this.NL }, () => [0, 0, 0]);
     this.comYawRef = new Float64Array(this.NL);
   }
 
   // footstepCmd: LA x 9 (x, y, z, r, p, yaw, ssp_t, dsp_t, height) in the first-stance frame.
-  generate(footstepCmd, vrpStateInit, comYawInit, comZ) {
+  // swingFootStart: current swing foot position in that frame. The step heights
+  // actually used (after the stepping-stone rewrite) are left in this.stepZ.
+  generate(footstepCmd, vrpStateInit, comYawInit, swingFootStart, comZ) {
     const { LA, dt, NL } = this;
     const stepX = [], stepY = [], stepZ = [], stepYaw = [], ssp = [], dsp = [], phase = [];
     for (let s = 0; s < LA; s++) {
@@ -39,16 +44,21 @@ class VrpGenerator {
     }
 
     // target foot points [x, y, z, yaw]
-    const stance = [], swing = [];
+    const stance = [], swing = [], cube = this.cubeDiagonal;
     stance.push([0, 0, this.vrpHeight + comZ[0], 0]);
+    if (Math.hypot(stepX[0] - swingFootStart[0], stepY[0] - swingFootStart[1]) < cube)
+      stepZ[0] = swingFootStart[2];
     swing.push([stepX[0], stepY[0], stance[0][2] + stepZ[0] + (comZ[1] - comZ[0]), stepYaw[0]]);
     for (let s = 1; s < LA; s++) {
       const st = swing[s - 1].slice();
       const c = Math.cos(st[3]), sn = Math.sin(st[3]);
       stance.push(st);
-      swing.push([st[0] + c * stepX[s] - sn * stepY[s], st[1] + sn * stepX[s] + c * stepY[s],
-                  st[2] + stepZ[s] + (comZ[s + 1] - comZ[s]), st[3] + stepYaw[s]]);
+      const x = st[0] + c * stepX[s] - sn * stepY[s], y = st[1] + sn * stepX[s] + c * stepY[s];
+      const d = s === 1 ? Math.hypot(x, y) : Math.hypot(x - stance[s - 2][0], y - stance[s - 2][1]);
+      if (d < cube) stepZ[s] = -stepZ[s - 1];
+      swing.push([x, y, st[2] + stepZ[s] + (comZ[s + 1] - comZ[s]), st[3] + stepYaw[s]]);
     }
+    this.stepZ = stepZ;
     // VRP horizontal offsets
     for (let s = 0; s < LA; s++) {
       const a = stance[s], b = swing[s], p = phase[s];
@@ -337,7 +347,8 @@ export class FootstepCommand {
     const sw = this.swingFootStancePos;
     const vrpState = [sw[0] / 2, sw[1] / 2, this.comPosStance[2]];
     const swingYaw = yawOf(this.swingFootStanceQuat);
-    this.vrp.generate(this.footCommand, vrpState, swingYaw / 2, this.comZCommand);
+    this.vrp.generate(this.footCommand, vrpState, swingYaw / 2, sw, this.comZCommand);
+    this.footCommand.forEach((fc, s) => { fc[2] = this.vrp.stepZ[s]; });
 
     const fc = this.footCommand[0];
     this.swingStartPos = sw.slice();

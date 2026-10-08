@@ -14,6 +14,7 @@
     #viewport { position: fixed; inset: 0; }
     #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
       justify-content: center; gap: 12px; background: #1b2330; z-index: 10; font-size: 15px; }
+    #loading[hidden] { display: none; }
     #loading .bar { width: 260px; height: 6px; background: #334; border-radius: 3px; overflow: hidden; }
     #loading .fill { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
     #panel { position: fixed; top: 12px; right: 12px; width: 320px; max-width: calc(100vw - 24px);
@@ -27,7 +28,7 @@
     button.primary { background: var(--accent); }
     .row.seed { align-items: center; }
     .row.seed label { color: var(--muted); }
-    .row.seed input { flex: 2; min-width: 0; padding: 6px 8px; border: 0; border-radius: 6px;
+    .row.seed input, .row.seed select { flex: 2; min-width: 0; padding: 6px 8px; border: 0; border-radius: 6px;
       background: #2b3444; color: var(--text); font: inherit; }
     #status { color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.6;
       border-top: 1px solid #2f3846; padding-top: 8px; }
@@ -57,11 +58,18 @@
   <button id="btn-ui" type="button">Hide UI</button>
 
   <div id="panel">
-    <h1>RISE · Footstep Policy on G1</h1>
+    <h1>RISE · Footstep Policy</h1>
     <p class="sub">
       MuJoCo (WebAssembly) simulation and footstep policy running in your browser.<br>
       <!-- 100 footsteps are sampled, stepping stones are built under them, and the robot follows the plan.  -->
       <a href="../" target="_top">← Back to RISE</a></p>
+    <div class="row seed">
+      <label for="robot">Robot</label>
+      <select id="robot">
+        <option value="g1">Unitree G1</option>
+        <option value="t1">Booster T1</option>
+      </select>
+    </div>
     <div class="row">
       <button id="btn-new" class="primary">New terrain</button>
       <button id="btn-restart">Restart</button>

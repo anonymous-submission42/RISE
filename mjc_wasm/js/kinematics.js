@@ -1,25 +1,11 @@
 // Port of g1_controller include/isaaclab/utils/kinematics.h.
-// Pinocchio is replaced by a scratch MjData on the same model with the pelvis
-// pinned at the origin, so every quantity is in the PELVIS frame and base
-// velocity is taken as zero (same assumption as the C++ helper).
+// Pinocchio is replaced by a scratch MjData on the same model with the root
+// (pelvis / trunk) pinned at the origin, so every quantity is in the ROOT frame
+// and base velocity is taken as zero (same assumption as the C++ helper).
 
 import { wrapToPi, quatNormalize, quatConj, quatMul } from './math.js';
 
 export const LEFT = 0, RIGHT = 1;
-
-// Unitree SDK motor order (g1_name_to_sdk in State_Footstep.cpp).
-export const SDK_JOINTS = [
-  'left_hip_pitch_joint', 'left_hip_roll_joint', 'left_hip_yaw_joint',
-  'left_knee_joint', 'left_ankle_pitch_joint', 'left_ankle_roll_joint',
-  'right_hip_pitch_joint', 'right_hip_roll_joint', 'right_hip_yaw_joint',
-  'right_knee_joint', 'right_ankle_pitch_joint', 'right_ankle_roll_joint',
-  'waist_yaw_joint', 'waist_roll_joint', 'waist_pitch_joint',
-  'left_shoulder_pitch_joint', 'left_shoulder_roll_joint', 'left_shoulder_yaw_joint',
-  'left_elbow_joint', 'left_wrist_roll_joint', 'left_wrist_pitch_joint', 'left_wrist_yaw_joint',
-  'right_shoulder_pitch_joint', 'right_shoulder_roll_joint', 'right_shoulder_yaw_joint',
-  'right_elbow_joint', 'right_wrist_roll_joint', 'right_wrist_pitch_joint', 'right_wrist_yaw_joint',
-];
-const FOOT_BODIES = ['left_ankle_roll_link', 'right_ankle_roll_link'];
 
 // Axis-angle vector of a unit quaternion (matches Kinematics::axis_angle_from_quat).
 function axisAngle(q) {
@@ -59,10 +45,11 @@ function solveSpd(A, b, n) {
 
 export class Kinematics {
   // `inertia`: per-joint [{joint, mass, lever}] of the URDF the controller uses
-  // (assets/g1/urdf_inertia.json, dumped from Pinocchio), applied over MuJoCo
-  // body frames. Like pinocchio::centerOfMass on the fixed-base model, the
-  // "universe" entry (pelvis + its fixed links) is left out of the CoM.
-  constructor(mujoco, model, inertia) {
+  // (assets/<robot>/urdf_inertia.json, dumped from Pinocchio), applied over
+  // MuJoCo body frames. Like pinocchio::centerOfMass on the fixed-base model,
+  // the "universe" entry (root + its fixed links) is left out of the CoM.
+  // `robot`: sdkJoints (motor order), legIds (left 6 then right 6), footBodies.
+  constructor(mujoco, model, inertia, robot) {
     this.mj = mujoco;
     this.model = model;
     this.data = new mujoco.MjData(model);
@@ -70,21 +57,23 @@ export class Kinematics {
     this.jacp = new mujoco.DoubleBuffer(3 * model.nv);
     this.jacr = new mujoco.DoubleBuffer(3 * model.nv);
 
-    const jointIds = SDK_JOINTS.map(n => mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT.value, n));
+    const jointIds = robot.sdkJoints.map(n => mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT.value, n));
+    this.n = jointIds.length;
     this.qadr = jointIds.map(j => model.jnt_qposadr[j]);
     this.dadr = jointIds.map(j => model.jnt_dofadr[j]);
-    this.footBody = FOOT_BODIES.map(n => mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, n));
+    this.legIds = [robot.legIds.slice(0, 6), robot.legIds.slice(6, 12)];
+    this.footBody = robot.footBodies.map(n => mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, n));
     this.links = inertia.filter(l => l.joint !== 'universe').map(({ joint, mass, lever }) => ({
       body: model.jnt_bodyid[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT.value, joint)],
       mass, lever,
     }));
     this.totalMass = this.links.reduce((m, l) => m + l.mass, 0);
-    this.q = new Float64Array(29);
-    this.qd = new Float64Array(29);
+    this.q = new Float64Array(this.n);
+    this.qd = new Float64Array(this.n);
     this.foot = [null, null];
   }
 
-  // q, qd: 29-dof arrays in SDK motor order.
+  // q, qd: full-body arrays in SDK motor order.
   setState(q, qd) {
     this.q.set(q);
     this.qd.set(qd);
@@ -97,7 +86,7 @@ export class Kinematics {
       const jp = this.jacp.GetView(), nv = this.model.nv;
       const lin = [0, 0, 0];
       for (let r = 0; r < 3; r++)
-        for (let i = 0; i < 29; i++) lin[r] += jp[r * nv + this.dadr[i]] * qd[i];
+        for (let i = 0; i < this.n; i++) lin[r] += jp[r * nv + this.dadr[i]] * qd[i];
       this.foot[s] = {
         pos: Array.from(d.xpos.subarray(3 * b, 3 * b + 3)),
         quat: quatNormalize(Array.from(d.xquat.subarray(4 * b, 4 * b + 4))),
@@ -122,24 +111,25 @@ export class Kinematics {
   footQuat(s) { return this.foot[s].quat; }
   footLinVel(s) { return this.foot[s].lin; }
   comPos() { return this.com; }
-  legQ(s) { return Array.from(this.q.subarray(6 * s, 6 * s + 6)); }
+  legQ(s) { return this.legIds[s].map(i => this.q[i]); }
 
   _fk(d, q) {
     const qpos = d.qpos;
     qpos.fill(0, 0, 7);
     qpos[3] = 1;
-    for (let i = 0; i < 29; i++) qpos[this.qadr[i]] = q[i];
+    for (let i = 0; i < this.n; i++) qpos[this.qadr[i]] = q[i];
     this.mj.mj_kinematics(this.model, d);
     this.mj.mj_comPos(this.model, d);
   }
 
-  // Damped least-squares IK for one leg (targets in the pelvis frame).
+  // Damped least-squares IK for one leg (targets in the root frame).
   diffIkLeg(s, targetPos, targetQuat, qInit, iters, lambda, posTol) {
+    const leg = this.legIds[s];
     const q = Float64Array.from(this.q);
-    for (let i = 0; i < 6; i++) q[6 * s + i] = qInit[i];
+    for (let i = 0; i < 6; i++) q[leg[i]] = qInit[i];
     const d = this.ikData, b = this.footBody[s], nv = this.model.nv;
     const lam2 = lambda * lambda;
-    const cols = this.dadr.slice(6 * s, 6 * s + 6);
+    const cols = leg.map(i => this.dadr[i]);
 
     for (let it = 0; it < iters; it++) {
       this._fk(d, q);
@@ -170,9 +160,9 @@ export class Kinematics {
       for (let c = 0; c < 6; c++) {
         let dq = 0;
         for (let r = 0; r < 6; r++) dq += J[r * 6 + c] * y[r];
-        q[6 * s + c] += dq;
+        q[leg[c]] += dq;
       }
     }
-    return Array.from(q.subarray(6 * s, 6 * s + 6), wrapToPi);
+    return leg.map(i => wrapToPi(q[i]));
   }
 }
