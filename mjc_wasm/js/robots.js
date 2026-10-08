@@ -49,7 +49,7 @@ export const ROBOTS = {
     // Exported actors (cmd: export_policy.py <onnx> <bin>); the first is the default.
     // All take the obs_full observation (660) and output 12 leg actions.
     policies: [
-      { name: 'policy1', file: 'policy/g1_260808_1834_3d_nolcp.bin' },
+      { name: 'policy1', file: 'policy/g1_260808_1834_3d.bin' },
     ],
     sdkJoints: G1_JOINTS,
     legIds: range(0, 12),
