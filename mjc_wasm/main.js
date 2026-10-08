@@ -43,15 +43,18 @@ async function loadRobotVfs(mujoco, robot) {
   return vfs;
 }
 
-// Everything a robot needs besides the terrain: model files, URDF inertia, policy.
+// Everything a robot needs besides the terrain and the policy: model files, URDF inertia.
 async function loadRobotAssets(mujoco, robot) {
-  const [vfs, sceneXml, inertia, weights] = await Promise.all([
+  const [vfs, sceneXml, inertia] = await Promise.all([
     loadRobotVfs(mujoco, robot),
     fetch(ASSETS + robot.dir + SCENE_FILE).then(r => r.text()),
     fetch(ASSETS + robot.dir + 'urdf_inertia.json').then(r => r.json()),
-    fetchBytes(ASSETS + robot.policy),
   ]);
-  return { vfs, sceneXml, inertia, mlp: new Mlp(POLICY_DIMS, weights.buffer) };
+  return { vfs, sceneXml, inertia };
+}
+
+async function loadPolicy(file) {
+  return new Mlp(POLICY_DIMS, (await fetchBytes(ASSETS + file)).buffer);
 }
 
 // gen_cmd.py N --realistic + convert_footcommand_2_global.py, skipping plans that
@@ -182,7 +185,9 @@ async function main() {
   setProgress(0, 'Loading MuJoCo…');
   const mujoco = await loadMujoco();
   const assets = {};  // robot key -> loaded assets
+  const policies = {}; // policy file -> Mlp
   let robotKey = 'g1';
+  let policyFile = null;
 
   // three.js
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -225,7 +230,8 @@ async function main() {
       disposeGroup(world);
     }
     const robot = ROBOTS[robotKey];
-    const { vfs, sceneXml, inertia, mlp } = assets[robotKey];
+    const { vfs, sceneXml, inertia } = assets[robotKey];
+    const mlp = policies[policyFile];
     const { plan, seed: used } = samplePlan(seed, robot);
     const model = mujoco.MjModel.from_xml_string(injectTerrain(sceneXml, terrainXml(plan, robot.terrain)), vfs);
     const data = new mujoco.MjData(model);
@@ -275,22 +281,34 @@ async function main() {
     $('btn-ui').textContent = hidden ? 'Show UI' : 'Hide UI';
   };
 
-  // Switch robot: fetch its assets on first use, then build a new terrain.
+  // Switch robot / policy: fetch assets and weights on first use, then build
+  // the terrain for `seed`.
   let switching = false;
-  async function selectRobot(key, seed) {
+  async function select(key, file, seed) {
     switching = true;
     try {
       if (!assets[key]) assets[key] = await loadRobotAssets(mujoco, ROBOTS[key]);
+      if (!policies[file]) {
+        setProgress(1, 'Loading policy…');
+        policies[file] = await loadPolicy(file);
+      }
       robotKey = key;
+      policyFile = file;
       setProgress(1, 'Compiling model…');
-      load(seed ?? ROBOTS[key].defaultSeed);
+      load(seed);
     } finally {
       $('loading').hidden = true;
       $('robot').value = robotKey;
+      $('policy').innerHTML = ROBOTS[robotKey].policies
+        .map(p => `<option value="${p.file}">${p.name}</option>`).join('');
+      $('policy').value = policyFile;
       switching = false;
     }
   }
+  const selectRobot = key => select(key, ROBOTS[key].policies[0].file, ROBOTS[key].defaultSeed);
   $('robot').onchange = () => selectRobot($('robot').value).catch(showError);
+  // a new policy restarts on the same terrain, so policies can be compared
+  $('policy').onchange = () => select(robotKey, $('policy').value, sim.seed).catch(showError);
 
   await selectRobot(robotKey);
 

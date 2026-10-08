@@ -8,7 +8,8 @@ import { Kinematics } from './kinematics.js';
 import { FootstepCommand } from './footstep_command.js';
 import { FootstepPolicy } from './policy.js';
 
-const HOLD_BLEND = 1.0; // [s]
+const HOLD_BLEND = 1.0; // [s] switch -> standing pose on the final footholds
+const INIT_BLEND = 2.0; // [s] standing pose -> init (FixStand) pose
 const PASSIVE_KD = 3;
 const FIXSTAND_TIME = 1.0; // [s] stand before walking (the operator presses g on hardware)
 
@@ -65,10 +66,7 @@ export class Controller {
   // Advance one physics step; the 50 Hz controller runs every `decimation` steps.
   step() {
     if (this.physicsStep % this.decimation === 0) this.controlTick();
-    if (this.mode === 'hold') {
-      const { from, to, t0 } = this.hold, a = Math.min(1, (this.data.time - t0) / HOLD_BLEND);
-      this.qTarget = from.map((q, i) => q + a * (to[i] - q));
-    }
+    if (this.mode === 'hold') this.qTarget = this.holdTarget(this.data.time - this.hold.t0);
     const d = this.data, qpos = d.qpos, qvel = d.qvel, ctrl = d.ctrl;
     for (let i = 0; i < this.n; i++) {
       ctrl[this.act[i]] = this.kp[i] * (this.qTarget[i] - qpos[this.qadr[i]]) - this.kd[i] * qvel[this.dadr[i]];
@@ -140,22 +138,33 @@ export class Controller {
     this.robot.legIds.forEach((m, i) => { this.qTarget[m] = action[i]; });
   }
 
-  // Joint PD (hold gains) toward a standing pose on the final footholds (IK,
-  // pelvis centred over the feet). Freezing the measured joint angles instead
-  // keeps the mid-gait lean and the robot usually tips over. The target starts
-  // where the hold gains reproduce the policy's last PD torque and blends to
-  // the standing pose over HOLD_BLEND, so the switch does not jolt the robot.
+  // Joint PD (hold gains) that brings the robot to rest. The target starts where
+  // the hold gains reproduce the policy's last PD torque (so the switch does not
+  // jolt the robot), blends to a standing pose on the final footholds (IK,
+  // pelvis centred over the feet) and then to the init (FixStand) pose. Freezing
+  // the measured joint angles instead keeps the mid-gait lean and the robot
+  // usually tips over.
   enterJointHold(s) {
-    const { hold, legIds, upperIds, footstep: c } = this.robot;
+    const { hold, legIds, upperIds, footstep: c, fixstand } = this.robot;
     const from = s.q.map((q, i) =>
       q + (this.kp[i] * (this.qTarget[i] - q) - this.kd[i] * s.qd[i] + hold.kd[i] * s.qd[i]) / hold.kp[i]);
-    const to = s.q.slice();
+    const stance = s.q.slice();
     const legs = this.command.standingJointPos(this.command.comZCommand[0]);
-    legIds.forEach((m, i) => { to[m] = legs[i]; });
-    upperIds.forEach((m, j) => { to[m] = c.upper_default[j]; });
+    legIds.forEach((m, i) => { stance[m] = legs[i]; });
+    upperIds.forEach((m, j) => { stance[m] = c.upper_default[j]; });
     this.mode = 'hold';
     this.kp = hold.kp.slice();
     this.kd = hold.kd.slice();
-    this.hold = { from, to, t0: this.data.time };
+    // [time since the switch, target]: piecewise-linear blend between them
+    this.hold = { t0: this.data.time, keys: [[0, from], [HOLD_BLEND, stance], [HOLD_BLEND + INIT_BLEND, fixstand.q]] };
+  }
+
+  holdTarget(t) {
+    const keys = this.hold.keys;
+    let k = 1;
+    while (k < keys.length - 1 && t > keys[k][0]) k++;
+    const [t0, a] = keys[k - 1], [t1, b] = keys[k];
+    const w = Math.min(1, Math.max(0, (t - t0) / (t1 - t0)));
+    return a.map((q, i) => q + w * (b[i] - q));
   }
 }

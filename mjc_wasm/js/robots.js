@@ -46,7 +46,11 @@ export const ROBOTS = {
     name: 'Unitree G1',
     dir: 'g1/',
     robotFile: 'g1_29dof.xml',
-    policy: 'policy/g1_260808_1834_3d_nolcp.bin',
+    // Exported actors (cmd: export_policy.py <onnx> <bin>); the first is the default.
+    // All take the obs_full observation (660) and output 12 leg actions.
+    policies: [
+      { name: 'policy1', file: 'policy/g1_260808_1834_3d_nolcp.bin' },
+    ],
     sdkJoints: G1_JOINTS,
     legIds: range(0, 12),
     upperIds: range(12, 29),
@@ -104,21 +108,23 @@ export const ROBOTS = {
       platformToGround: false,    // fixed 10 cm platform with its top at z = 0
       targetMeshes: ['left_ankle_roll_link', 'right_ankle_roll_link'],
     },
-    defaultSeed: 6,
+    defaultSeed: 42,
   },
 
   t1: {
     name: 'Booster T1',
     dir: 't1/',
     robotFile: 'T1_23dof.xml',
-    policy: 'policy/t1_260908_0133_3d.bin',
+    policies: [
+      { name: 'policy1', file: 'policy/t1_260826_1619_3d.bin' },
+    ],
     sdkJoints: T1_JOINTS,
     legIds: range(11, 23),
     upperIds: range(0, 11),
     footBodies: ['left_foot_link', 'right_foot_link'],
     footstep: {
       step_dt: 0.02, future_foot_step_num: 2,
-      vrp_height: 0.5515, pelv_com_offset: 0.0844, vrpx_offset: 0.08, vrpy_offset: 0.02,
+      vrp_height: 0.5515, pelv_com_offset: 0.0844, vrpx_offset: 0.03, vrpy_offset: 0.02,
       vrp_horizon_length: 4.0, preview_horizon_length: 1.6,
       // t1_controller's vrp_generator.h keeps the Tocabi stepping-stone rewrite
       cube_diagonal_length: 0.361,
@@ -146,21 +152,21 @@ export const ROBOTS = {
     },
     hold: null, // set below: FixStand gains
     plan: {
-      range: { x: [0.2, 0.25], y: [0.2, 0.3], z: [-0.1, 0.15], yaw: [-0.4, 0.4] },
+      range: { x: [0.2, 0.25], y: [0.2, 0.3], z: [-0.1, 0.1], yaw: [-0.4, 0.4] },
       nominalY: 0.212, firstStep: [0.2, 0.212],
-      ssp: 0.8, dsp: 0.1, height: 0.04, comZ: 0,
+      ssp: 0.7, dsp: 0.15, height: 0.04, comZ: -0.0,
       init_lfoot: { x: 0, y: 0.10625, z: 0.043, yaw: 0 },
       init_rfoot: { x: 0, y: -0.10625, z: 0.043, yaw: 0 },
     },
     terrain: {
       ...ROCKY,
-      stoneOffset: [0.01, 0, -0.043],
+      stoneOffset: [-0.02, 0, -0.043],
       clearance: 0.01, flushRadius: 0.35, flushBlend: 0.25, flushDrop: 0.002,
       flushDropBehindOnly: false, // uniform 2 mm drop (z-fighting) around each stone
       platformToGround: true,     // platform reaches down to the lowest terrain
       targetMeshes: ['left_foot_link', 'right_foot_link'],
     },
-    defaultSeed: 6,
+    defaultSeed: 42,
   },
 };
 ROBOTS.t1.hold = { kp: ROBOTS.t1.fixstand.kp, kd: ROBOTS.t1.fixstand.kd };
