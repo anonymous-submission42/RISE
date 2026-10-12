@@ -51,7 +51,7 @@
   
   <!-- Critical CSS - Load synchronously -->
   <link rel="stylesheet" href="static/css/bulma.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=4">
+  <link rel="stylesheet" href="static/css/index.css?v=5">
   
   <!-- Non-critical CSS - Load asynchronously -->
   <link rel="preload" href="static/css/bulma-carousel.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -160,35 +160,35 @@
               <div class="publication-links">
                 <!-- TODO: Update with your arXiv paper ID -->
                 <span class="link-block">
-                  <a href="static/pdfs/rise.pdf" target="_blank"
-                  class="external-link button is-normal is-rounded is-dark">
+                  <span class="external-link button is-normal is-rounded is-dark is-soon" aria-disabled="true">
                   <span class="icon">
                     <i class="fas fa-file-pdf"></i>
                   </span>
                   <span>Paper</span>
-                  </a>
+                  <span class="soon-tip">Coming Soon</span>
+                  </span>
                 </span>
 
                 <!-- TODO: Add your supplementary material PDF or remove this section -->
                 <span class="link-block">
-                  <a href="static/pdfs/supplementary_material.pdf" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
+                  <span class="external-link button is-normal is-rounded is-dark is-soon" aria-disabled="true">
                   <span class="icon">
                     <i class="fas fa-file-pdf"></i>
                   </span>
                   <span>Supplementary</span>
-                  </a>
+                  <span class="soon-tip">Coming Soon</span>
+                  </span>
                 </span>
 
                 <!-- TODO: Replace with your GitHub repository URL -->
                 <span class="link-block">
-                  <a href="https://github.com/YOUR REPO HERE" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
+                  <span class="external-link button is-normal is-rounded is-dark is-soon" aria-disabled="true">
                   <span class="icon">
                     <i class="fab fa-github"></i>
                   </span>
                   <span>Code</span>
-                  </a>
+                  <span class="soon-tip">Coming Soon</span>
+                  </span>
                 </span>
 
                 <span class="link-block">
@@ -261,9 +261,6 @@
   <div class="hero-body">
     <div class="container is-max-desktop">
       <h2 class="title is-3">Interactive Demo</h2>
-      <!-- <p class="demo-description">
-        The deployed G1 controller running live in your browser on MuJoCo (WebAssembly). A sequence of 100 random 3D footholds is sampled and stepping stones are built under them. At every control step, the FIPM preview controller and inverse kinematics generate the guidance, and the policy follows the footholds. Click <em>New terrain</em> to try another sequence.
-      </p> -->
       <div class="demo-frame">
         <button class="demo-launch" type="button" onclick="launchDemo(this)" aria-label="Launch the interactive simulation">
           <img src="static/images/mujoco_demo_preview.jpg?v=2" alt="Unitree G1 walking over randomly generated rocky terrain in the browser simulation" loading="lazy"/>
@@ -273,9 +270,7 @@
       <p class="demo-note">Downloads about 30 MB on first launch; a desktop browser is recommended. <a href="mjc_wasm/" target="_blank">Open in a new tab</a></p>
     </div>
   </div>
-  <!-- Kept inline (not in index.js) so a cached older index.js cannot break the button. -->
   <script>
-    // Load the MuJoCo simulation (~30 MB) only when asked.
     function launchDemo(button) {
       const iframe = document.createElement('iframe');
       iframe.src = 'mjc_wasm/';
